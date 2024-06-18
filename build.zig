@@ -16,7 +16,8 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Export module
-    //_ = b.addModule("ziglyph", .{ .root_source_file = b.path("src/ziglyph.zig") });
+    b.addModule("zargh", .{ .root_source_file = b.path("src/zargh.zig") });
+
     const ziglyph = b.dependency("ziglyph", .{
         .optimize = optimize,
         .target = target,
