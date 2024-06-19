@@ -136,6 +136,11 @@ test "parsing argument optional/required options" {
     _ = try parser.parse("-e");
     try expect(ctx.e.value == null);
     try expect(parser.option_expecting_argument.? == &ctx.e);
+    _ = try parser.parse("val");
+
+    _ = try parser.parse("--hlongopt");
+    _ = try parser.parse("value");
+    try expect(std.mem.eql(u8, ctx.h.value.?, "value"));
 
     // reset option_
     parser.option_expecting_argument = null;
