@@ -1,40 +1,50 @@
+//
+// zig argument parsing lib
+//
+
 const std = @import("std");
 
-pub const OptionArgumentType = enum { none, required, optional };
-pub const ParseError = error{
-    InvalidLongOption,
-    InvalidShortOption,
-    UnexpectedArgument,
-};
+pub fn getArgs(allocator: std.mem.Allocator) !std.ArrayList([]const u8) {
+    var container = std.ArrayList([]const u8).init(allocator);
+    var argiter = try std.process.argsWithAllocator(allocator);
+    defer argiter.deinit();
 
-pub fn pop32Hash(str: []const u8) u32 {
-    // taken from:
-    // https://stackoverflow.com/questions/2351087/what-is-the-best-32bit-hash-function-for-short-strings-tag-names
-    //
-    // which is taken from:
-    // The Practice of Programming (HASH TABLES, pg. 57)
-
-    // Empirically, the values 31 and 37 have proven to be good choices for the
-    // multiplier in a hash function for ASCII strings.
-    const multiplier = 31;
-
-    var h: u32 = 0;
-    for (str) |c| {
-        h = multiplier *% h +% c;
+    while (argiter.next()) |arg| {
+        try container.append(arg);
     }
-    return h;
+
+    return container;
 }
+
+pub const OptionArgumentType = enum { none, required, optional };
 
 pub const Option = struct {
     short: ?u8 = null,
     long: ?[]const u8 = null,
     help: []const u8,
-    action: ?*const fn (context: *anyopaque) void = null,
+    action: ?*const fn (context: *anyopaque, opt: *Option) void = null,
 
     flag: bool = false,
     count: usize = 0,
     value: ?[]const u8 = null,
     argument: OptionArgumentType = .none,
+
+    pub const Actions = struct {
+        pub fn incrementCount(context: *anyopaque, opt: *Option) void {
+            _ = context;
+            opt.count += 1;
+        }
+        pub fn storeTrue(context: *anyopaque, opt: *Option) void {
+            _ = context;
+            opt.flag = true;
+        }
+    };
+};
+
+pub const ParseError = error{
+    InvalidLongOption,
+    InvalidShortOption,
+    UnexpectedArgument,
 };
 
 pub fn Parser(comptime T: type) type {
@@ -174,10 +184,8 @@ pub fn Parser(comptime T: type) type {
 
             if (self.option_expecting_argument) |oea| {
                 oea.value = str;
-                oea.flag = true;
-                oea.count += 1;
                 if (oea.action) |action| {
-                    action(self.context);
+                    action(self.context, oea);
                 }
 
                 self.option_expecting_argument = null;
@@ -252,10 +260,8 @@ pub fn Parser(comptime T: type) type {
                     return true;
                 }
 
-                optr.flag = true;
-                optr.count += 1;
                 if (optr.action) |action| {
-                    action(self.context);
+                    action(self.context, optr);
                 }
                 return true;
             }
@@ -289,11 +295,9 @@ pub fn Parser(comptime T: type) type {
                 if (self.find_shortopt(ch)) |optr| switch (optr.argument) {
                     .none => {
                         // default behavior
-                        optr.flag = true;
-                        optr.count += 1;
                         optr.value = null;
                         if (optr.action) |action| {
-                            action(self.context);
+                            action(self.context, optr);
                         }
                     },
                     .required => {
@@ -301,29 +305,23 @@ pub fn Parser(comptime T: type) type {
                             self.option_expecting_argument = optr;
                             optr.value = null;
                         } else {
-                            optr.flag = true;
-                            optr.count += 1;
                             optr.value = str[i + 1 ..];
                             if (optr.action) |action| {
-                                action(self.context);
+                                action(self.context, optr);
                             }
                         }
                         return true;
                     },
                     .optional => {
                         if (i == str.len - 1) {
-                            optr.flag = true;
-                            optr.count += 1;
                             optr.value = null;
                             if (optr.action) |action| {
-                                action(self.context);
+                                action(self.context, optr);
                             }
                         } else {
-                            optr.flag = true;
-                            optr.count += 1;
                             optr.value = str[i + 1 ..];
                             if (optr.action) |action| {
-                                action(self.context);
+                                action(self.context, optr);
                             }
                         }
                         return true;
@@ -341,7 +339,7 @@ pub fn Parser(comptime T: type) type {
 const ShortOptionDescriptor = struct {
     fieldname: []const u8,
     short: u8,
-    action: ?*const fn (context: *anyopaque) void,
+    action: ?*const fn (context: *anyopaque, opt: *Option) void,
     help: []const u8,
 
     pub fn _lt_short(context: void, a: ShortOptionDescriptor, b: ShortOptionDescriptor) bool {
@@ -353,12 +351,30 @@ const ShortOptionDescriptor = struct {
 const LongOptionDescriptor = struct {
     fieldname: []const u8,
     long: []const u8,
-    action: ?*const fn (context: *anyopaque) void,
+    action: ?*const fn (context: *anyopaque, opt: *Option) void,
     help: []const u8,
     argument: OptionArgumentType,
     // TODO - hash
     hash: u32,
 };
+
+fn pop32Hash(str: []const u8) u32 {
+    // taken from:
+    // https://stackoverflow.com/questions/2351087/what-is-the-best-32bit-hash-function-for-short-strings-tag-names
+    //
+    // which is taken from:
+    // The Practice of Programming (HASH TABLES, pg. 57)
+
+    // Empirically, the values 31 and 37 have proven to be good choices for the
+    // multiplier in a hash function for ASCII strings.
+    const multiplier = 31;
+
+    var h: u32 = 0;
+    for (str) |c| {
+        h = multiplier *% h +% c;
+    }
+    return h;
+}
 
 fn getNumShortOptions(comptime T: type) usize {
     var n: usize = 0;
