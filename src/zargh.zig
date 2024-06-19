@@ -34,8 +34,13 @@ pub const Option = struct {
             _ = context;
             opt.count += 1;
         }
-        pub fn storeTrue(context: *anyopaque, opt: *Option) void {
+        pub fn flagTrue(context: *anyopaque, opt: *Option) void {
             _ = context;
+            opt.flag = true;
+        }
+        pub fn incrementAndFlag(context: *anyopaque, opt: *Option) void {
+            _ = context;
+            opt.count += 1;
             opt.flag = true;
         }
     };

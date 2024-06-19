@@ -7,8 +7,8 @@ const expectError = std.testing.expectError;
 const ParseContext = struct {
     const Self = @This();
     a: za.Option = .{ .short = 'a', .help = "short option a with action", .action = Self.testAction },
-    b: za.Option = .{ .short = 'b', .help = "short option b" },
-    c: za.Option = .{ .long = "c", .help = "long option c" },
+    b: za.Option = .{ .short = 'b', .help = "short option b", .action = za.Option.Actions.incrementAndFlag },
+    c: za.Option = .{ .long = "c", .help = "long option c", .action = za.Option.Actions.incrementAndFlag },
 
     d: za.Option = .{ .short = 'd', .argument = .optional, .help = "short option d, argument=optional" },
     e: za.Option = .{ .short = 'e', .argument = .required, .help = "short option e, argument=required" },
@@ -21,9 +21,10 @@ const ParseContext = struct {
     l: za.Option = .{ .short = 'l', .help = "dangling short option j" },
     testvar: bool = false,
 
-    pub fn testAction(context: *anyopaque) void {
+    pub fn testAction(context: *anyopaque, opt: *za.Option) void {
         var self: *Self = @ptrCast(@alignCast(context));
 
+        za.Option.Actions.incrementAndFlag(context, opt);
         self.testvar = true;
     }
 };
